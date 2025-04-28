@@ -25,10 +25,13 @@
         .editor-container {
             display: flex;
             position: relative;
+            max-height: 80vh; /* Limit the maximum height */
+            overflow: hidden;
         }
         #json-input {
             flex: 1;
-            height: 300px;
+            min-height: 300px;
+            max-height: 80vh; /* Match container max height */
             background-color: #282a36;
             color: #f8f8f2;
             border: 1px solid #44475a;
@@ -41,10 +44,12 @@
             white-space: pre;
             tab-size: 2;
             margin-left: 0;
+            overflow: auto; /* Add scrollbars when needed */
         }
         .line-numbers {
             width: 40px;
             min-height: 300px;
+            max-height: 80vh; /* Match container max height */
             text-align: right;
             padding: 10px 5px 10px 0;
             background-color: #21222c;
@@ -55,7 +60,8 @@
             border: 1px solid #44475a;
             border-right: none;
             border-radius: 4px 0 0 4px;
-            overflow: hidden;
+            overflow-y: hidden; /* Hide vertical scrollbar */
+            overflow-x: hidden; /* Hide horizontal scrollbar */
             user-select: none;
         }
         .button-group {
@@ -165,7 +171,7 @@
     <div class="container">
         <p style="text-align: center; margin-bottom: 20px;">
             <a href="https://github.com/nilicule/jsonValidate" style="color: #8be9fd; text-decoration: none;">
-                Fork me on GitHub
+                View on GitHub
             </a>
         </p>
         <div class="editor-container" id="editor-container">
@@ -213,8 +219,13 @@
             const lines = jsonInput.value.split('\n').length;
             lineNumbers.innerHTML = Array(lines).fill(0).map((_, i) => `${i + 1}`).join('<br>');
 
-            // Ensure line numbers div height matches the textarea
+            // Ensure line numbers div height matches the textarea's scrollHeight
             lineNumbers.style.height = `${jsonInput.scrollHeight}px`;
+
+            // Adjust the textarea's displayed height to show all content
+            jsonInput.style.height = 'auto';
+            const preferredHeight = Math.max(300, jsonInput.scrollHeight);
+            jsonInput.style.height = `${preferredHeight}px`;
         }
 
         jsonInput.addEventListener('input', function() {
@@ -240,7 +251,14 @@
                 const parsed = JSON.parse(jsonStr);
                 const formatted = JSON.stringify(parsed, null, 2);
                 jsonInput.value = formatted;
-                updateLineNumbers();
+
+                // Explicitly update the textarea height after formatting
+                setTimeout(() => {
+                    updateLineNumbers();
+                    jsonInput.style.height = 'auto';
+                    jsonInput.style.height = `${Math.max(300, jsonInput.scrollHeight)}px`;
+                }, 0);
+
                 clearHighlights();
                 hideError();
                 showSuccess();
@@ -386,9 +404,7 @@
         // Show success message
         function showSuccess() {
             successMessage.style.display = 'block';
-            setTimeout(() => {
-                successMessage.style.display = 'none';
-            }, 3000);
+            // No timeout to remove the message - it will stay visible
         }
 
         // Hide success message
