@@ -28,12 +28,29 @@
             max-height: 80vh; /* Limit the maximum height */
             overflow: hidden;
         }
+        .highlight-container {
+            position: absolute;
+            left: 40px; /* Width of line numbers */
+            top: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            overflow: auto;
+            white-space: pre;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 10px;
+            background-color: transparent;
+            z-index: 5;
+        }
         #json-input {
             flex: 1;
             min-height: 300px;
             max-height: 80vh; /* Match container max height */
             background-color: #282a36;
-            color: #f8f8f2;
+            color: transparent;
+            caret-color: #f8f8f2; /* Keep cursor visible */
             border: 1px solid #44475a;
             border-radius: 0 4px 4px 0;
             padding: 10px;
@@ -45,6 +62,7 @@
             tab-size: 2;
             margin-left: 0;
             overflow: auto; /* Add scrollbars when needed */
+            z-index: 1;
         }
         .line-numbers {
             width: 40px;
@@ -177,6 +195,7 @@
         <div class="editor-container" id="editor-container">
             <div class="line-numbers" id="line-numbers"></div>
             <textarea id="json-input" spellcheck="false" placeholder="Paste your JSON here..."></textarea>
+            <div id="highlight-container" class="highlight-container"></div>
         </div>
 
         <div class="button-group">
@@ -213,6 +232,7 @@
         const successMessage = document.getElementById('success-message');
         const lineNumbers = document.getElementById('line-numbers');
         const editorContainer = document.getElementById('editor-container');
+        const highlightContainer = document.getElementById('highlight-container');
 
         // Generate line numbers
         function updateLineNumbers() {
@@ -235,7 +255,57 @@
 
         jsonInput.addEventListener('scroll', () => {
             lineNumbers.scrollTop = jsonInput.scrollTop;
+            highlightContainer.scrollTop = jsonInput.scrollTop;
             updateHighlightPositions();
+        });
+
+        // Function to apply syntax highlighting to JSON
+        function applyHighlighting(text) {
+            if (!text) {
+                highlightContainer.innerHTML = '';
+                return;
+            }
+
+            try {
+                // Try to parse as JSON to ensure it's valid
+                JSON.parse(text);
+
+                // Apply syntax highlighting
+                let highlighted = text
+                    // Replace HTML special characters to prevent XSS
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    // Highlight strings (must be done first)
+                    .replace(/"(\\.|[^"\\])*"/g, '<span class="syntax-string">$&</span>')
+                    // Highlight keys
+                    .replace(/("(\\.|[^"\\])*")\s*:/g, '<span class="syntax-key">$1</span><span class="syntax-colon">:</span>')
+                    // Highlight numbers
+                    .replace(/\b(-?\d+(\.\d+)?([eE][+-]?\d+)?)\b/g, '<span class="syntax-number">$&</span>')
+                    // Highlight booleans
+                    .replace(/\b(true|false)\b/g, '<span class="syntax-boolean">$&</span>')
+                    // Highlight null
+                    .replace(/\bnull\b/g, '<span class="syntax-null">$&</span>')
+                    // Highlight brackets
+                    .replace(/[\[\]{}]/g, '<span class="syntax-bracket">$&</span>')
+                    // Highlight commas
+                    .replace(/,/g, '<span class="syntax-comma">$&</span>');
+
+                highlightContainer.innerHTML = highlighted;
+            } catch (e) {
+                // If JSON is invalid, just show the plain text
+                highlightContainer.innerHTML = text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+        }
+
+        // Update highlighting when input changes
+        jsonInput.addEventListener('input', function() {
+            updateLineNumbers();
+            clearHighlights();
+            applyHighlighting(jsonInput.value);
         });
 
         // Format and validate JSON
@@ -257,6 +327,7 @@
                     updateLineNumbers();
                     jsonInput.style.height = 'auto';
                     jsonInput.style.height = `${Math.max(300, jsonInput.scrollHeight)}px`;
+                    applyHighlighting(jsonInput.value);
                 }, 0);
 
                 clearHighlights();
@@ -274,6 +345,7 @@
             hideSuccess();
             clearHighlights();
             updateLineNumbers();
+            applyHighlighting('');
         });
 
         // Compress JSON
@@ -291,6 +363,7 @@
                 jsonInput.value = compressed;
                 updateLineNumbers();
                 clearHighlights();
+                applyHighlighting(compressed);
                 hideError();
                 showSuccess();
             } catch (err) {
@@ -314,6 +387,8 @@
         function handleJsonError(err, jsonStr) {
             hideSuccess();
             clearHighlights();
+            // Still apply basic highlighting for invalid JSON
+            applyHighlighting(jsonStr);
 
             // Parse error message
             const errorMsg = err.message;
@@ -478,8 +553,9 @@
             jsonInput.scrollTop = position;
         }
 
-        // Initialize line numbers on load
+        // Initialize line numbers and highlighting on load
         updateLineNumbers();
+        applyHighlighting(jsonInput.value);
     </script>
 </body>
 </html>
