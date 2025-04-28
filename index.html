@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Formatter and Validator</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #1e1e2e;
+            color: #f8f8f2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #f8f8f2;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .editor-container {
+            display: flex;
+            position: relative;
+        }
+        #json-input {
+            flex: 1;
+            height: 300px;
+            background-color: #282a36;
+            color: #f8f8f2;
+            border: 1px solid #44475a;
+            border-radius: 0 4px 4px 0;
+            padding: 10px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre;
+            tab-size: 2;
+            margin-left: 0;
+        }
+        .line-numbers {
+            width: 40px;
+            min-height: 300px;
+            text-align: right;
+            padding: 10px 5px 10px 0;
+            background-color: #21222c;
+            color: #6272a4;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border: 1px solid #44475a;
+            border-right: none;
+            border-radius: 4px 0 0 4px;
+            overflow: hidden;
+            user-select: none;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        #validate-btn {
+            background-color: #50fa7b;
+            color: #282a36;
+        }
+        #validate-btn:hover {
+            background-color: #5af78e;
+        }
+        #clear-btn {
+            background-color: #282a36;
+            color: #f8f8f2;
+            border: 1px solid #44475a;
+        }
+        #clear-btn:hover {
+            background-color: #383a46;
+        }
+        #compress-btn {
+            background-color: #6272a4;
+            color: #f8f8f2;
+        }
+        #compress-btn:hover {
+            background-color: #7280b4;
+        }
+        #copy-btn {
+            background-color: #bd93f9;
+            color: #282a36;
+        }
+        #copy-btn:hover {
+            background-color: #c9a3f9;
+        }
+        .error-container {
+            background-color: #ff5555;
+            color: #f8f8f2;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            display: none;
+        }
+        .error-title {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .error-details {
+            border-top: 1px dashed rgba(255, 255, 255, 0.3);
+            padding-top: 10px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+        }
+        .error-line {
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .error-pointer {
+            white-space: pre;
+            color: #ff8888;
+        }
+        .success-message {
+            background-color: #50fa7b;
+            color: #282a36;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+        .line-highlight {
+            background-color: rgba(255, 85, 85, 0.3);
+            position: absolute;
+            width: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .line-number-highlight {
+            background-color: rgba(255, 85, 85, 0.5);
+            position: absolute;
+            width: 40px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .syntax-string { color: #f1fa8c; }
+        .syntax-number { color: #bd93f9; }
+        .syntax-boolean { color: #ff79c6; }
+        .syntax-null { color: #ff79c6; }
+        .syntax-key { color: #ff5555; }
+        .syntax-colon { color: #f8f8f2; }
+        .syntax-comma { color: #f8f8f2; }
+        .syntax-bracket { color: #8be9fd; }
+    </style>
+</head>
+<body>
+    <h1>JSON Formatter and Validator</h1>
+    <div class="container">
+        <div class="editor-container" id="editor-container">
+            <div class="line-numbers" id="line-numbers"></div>
+            <textarea id="json-input" spellcheck="false" placeholder="Paste your JSON here..."></textarea>
+        </div>
+
+        <div class="button-group">
+            <button id="validate-btn">Validate & Format JSON</button>
+            <button id="clear-btn">Clear</button>
+            <button id="compress-btn">Compress</button>
+            <button id="copy-btn">Copy to Clipboard</button>
+        </div>
+
+        <div class="success-message" id="success-message">
+            Valid JSON! Successfully formatted.
+        </div>
+
+        <div class="error-container" id="error-container">
+            <div class="error-title">Invalid JSON!</div>
+            <div id="error-message"></div>
+            <div class="error-details">
+                <div id="error-line" class="error-line"></div>
+                <div id="error-pointer" class="error-pointer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const jsonInput = document.getElementById('json-input');
+        const validateBtn = document.getElementById('validate-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const compressBtn = document.getElementById('compress-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const errorLine = document.getElementById('error-line');
+        const errorPointer = document.getElementById('error-pointer');
+        const successMessage = document.getElementById('success-message');
+        const lineNumbers = document.getElementById('line-numbers');
+        const editorContainer = document.getElementById('editor-container');
+
+        // Generate line numbers
+        function updateLineNumbers() {
+            const lines = jsonInput.value.split('\n').length;
+            lineNumbers.innerHTML = Array(lines).fill(0).map((_, i) => `${i + 1}`).join('<br>');
+
+            // Ensure line numbers div height matches the textarea
+            lineNumbers.style.height = `${jsonInput.scrollHeight}px`;
+        }
+
+        jsonInput.addEventListener('input', function() {
+            updateLineNumbers();
+            clearHighlights();
+        });
+
+        jsonInput.addEventListener('scroll', () => {
+            lineNumbers.scrollTop = jsonInput.scrollTop;
+            updateHighlightPositions();
+        });
+
+        // Format and validate JSON
+        validateBtn.addEventListener('click', () => {
+            const jsonStr = jsonInput.value.trim();
+
+            if (!jsonStr) {
+                showError("Error: Please enter some JSON to validate.");
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(jsonStr);
+                const formatted = JSON.stringify(parsed, null, 2);
+                jsonInput.value = formatted;
+                updateLineNumbers();
+                clearHighlights();
+                hideError();
+                showSuccess();
+            } catch (err) {
+                handleJsonError(err, jsonStr);
+            }
+        });
+
+        // Clear the input
+        clearBtn.addEventListener('click', () => {
+            jsonInput.value = '';
+            hideError();
+            hideSuccess();
+            clearHighlights();
+            updateLineNumbers();
+        });
+
+        // Compress JSON
+        compressBtn.addEventListener('click', () => {
+            const jsonStr = jsonInput.value.trim();
+
+            if (!jsonStr) {
+                showError("Error: Please enter some JSON to compress.");
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(jsonStr);
+                const compressed = JSON.stringify(parsed);
+                jsonInput.value = compressed;
+                updateLineNumbers();
+                clearHighlights();
+                hideError();
+                showSuccess();
+            } catch (err) {
+                handleJsonError(err, jsonStr);
+            }
+        });
+
+        // Copy to clipboard
+        copyBtn.addEventListener('click', () => {
+            jsonInput.select();
+            document.execCommand('copy');
+
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        });
+
+        // Handle JSON parsing error
+        function handleJsonError(err, jsonStr) {
+            hideSuccess();
+            clearHighlights();
+
+            // Parse error message
+            const errorMsg = err.message;
+
+            // Extract line number from error message
+            const lineMatch = errorMsg.match(/line (\d+)/i);
+
+            if (lineMatch) {
+                // Get the raw line number from the error message
+                let lineNumber = parseInt(lineMatch[1], 10);
+
+                // Check if this is likely a "missing something from previous line" error
+                // Common patterns in JSON errors where the actual error is on the previous line:
+                // 1. Expecting a comma or closing bracket when reaching a new property
+                // 2. Unexpected token errors at the beginning of a line
+                const isLikelyPreviousLineError =
+                    (errorMsg.includes("Expected") &&
+                     (errorMsg.includes("','") || errorMsg.includes("'}'") || errorMsg.includes("']'"))) ||
+                    (errorMsg.includes("Unexpected") && errorMsg.includes("token")) ||
+                    (errorMsg.includes("Expecting") &&
+                     (errorMsg.includes("EOF") || errorMsg.includes("','") || errorMsg.includes("'}'") || errorMsg.includes("']'")));
+
+                // Adjust the line number if needed
+                if (isLikelyPreviousLineError) {
+                    lineNumber = Math.max(1, lineNumber - 1);
+                }
+
+                // Get the content of the error line
+                const lines = jsonStr.split('\n');
+                const errorLineContent = lines[lineNumber - 1] || '';
+
+                // Extract column information if available
+                const columnMatch = errorMsg.match(/column (\d+)/i) || errorMsg.match(/position (\d+)/i);
+                const column = columnMatch ? parseInt(columnMatch[1], 10) : 0;
+
+                // Create pointer string (the ^ character under the error position)
+                const pointer = ' '.repeat(column) + '^';
+
+                // Set error message and details
+                errorMessage.textContent = err.message;
+                errorLine.textContent = errorLineContent;
+                errorPointer.textContent = pointer;
+
+                // Show error message
+                showError();
+
+                // Highlight the interpreted line where the error most likely is
+                highlightLine(lineNumber);
+
+                // Add a note if we adjusted the line number
+                if (isLikelyPreviousLineError) {
+                    const noteElement = document.createElement('div');
+                    noteElement.textContent = "Note: Error detected on line " + (lineNumber + 1) + " but likely caused by a missing character on line " + lineNumber;
+                    noteElement.style.marginTop = "10px";
+                    noteElement.style.fontStyle = "italic";
+
+                    // Add after the error pointer
+                    errorPointer.parentNode.appendChild(noteElement);
+                }
+
+                // Scroll to the error line
+                scrollToLine(lineNumber);
+            } else {
+                // Fallback if no line number is found
+                errorMessage.textContent = err.message;
+                errorLine.textContent = '';
+                errorPointer.textContent = '';
+                showError();
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            if (message) {
+                errorMessage.textContent = message;
+                errorLine.textContent = '';
+                errorPointer.textContent = '';
+            }
+            errorContainer.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+
+        // Hide error message
+        function hideError() {
+            errorContainer.style.display = 'none';
+        }
+
+        // Show success message
+        function showSuccess() {
+            successMessage.style.display = 'block';
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        // Hide success message
+        function hideSuccess() {
+            successMessage.style.display = 'none';
+        }
+
+        // Highlight a specific line in the editor
+        function highlightLine(lineNumber) {
+            clearHighlights();
+
+            // Get line height and padding
+            const lineHeight = parseInt(getComputedStyle(jsonInput).lineHeight);
+            const paddingTop = parseInt(getComputedStyle(jsonInput).paddingTop);
+
+            // Calculate the position for the highlight
+            const topPosition = (lineNumber - 1) * lineHeight + paddingTop;
+
+            // Create highlight for the text area
+            const textHighlight = document.createElement('div');
+            textHighlight.className = 'line-highlight';
+            textHighlight.style.left = '40px';
+            textHighlight.style.top = topPosition + 'px';
+            textHighlight.style.height = lineHeight + 'px';
+            textHighlight.style.width = jsonInput.clientWidth + 'px';
+            textHighlight.dataset.line = lineNumber;
+
+            // Create highlight for the line number
+            const numberHighlight = document.createElement('div');
+            numberHighlight.className = 'line-number-highlight';
+            numberHighlight.style.left = '0';
+            numberHighlight.style.top = topPosition + 'px';
+            numberHighlight.style.height = lineHeight + 'px';
+            numberHighlight.dataset.line = lineNumber;
+
+            // Add highlights to the container
+            editorContainer.appendChild(textHighlight);
+            editorContainer.appendChild(numberHighlight);
+
+            // Update positions based on current scroll
+            updateHighlightPositions();
+        }
+
+        // Clear all line highlights
+        function clearHighlights() {
+            const highlights = document.querySelectorAll('.line-highlight, .line-number-highlight');
+            highlights.forEach(el => el.remove());
+        }
+
+        // Update highlight positions when scrolling
+        function updateHighlightPositions() {
+            const scrollTop = jsonInput.scrollTop;
+            const highlights = document.querySelectorAll('.line-highlight, .line-number-highlight');
+
+            highlights.forEach(highlight => {
+                const lineNumber = parseInt(highlight.dataset.line, 10);
+                const lineHeight = parseInt(getComputedStyle(jsonInput).lineHeight);
+                const paddingTop = parseInt(getComputedStyle(jsonInput).paddingTop);
+
+                const position = (lineNumber - 1) * lineHeight + paddingTop - scrollTop;
+                highlight.style.top = position + 'px';
+            });
+        }
+
+        // Scroll to a specific line
+        function scrollToLine(lineNumber) {
+            const lineHeight = parseInt(getComputedStyle(jsonInput).lineHeight);
+            const paddingTop = parseInt(getComputedStyle(jsonInput).paddingTop);
+            const position = (lineNumber - 1) * lineHeight;
+
+            jsonInput.scrollTop = position;
+        }
+
+        // Initialize line numbers on load
+        updateLineNumbers();
+    </script>
+</body>
+</html>
